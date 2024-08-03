@@ -4,8 +4,8 @@ USBMIDI_Interface midi;
 
 class MyNoteButton : public MIDIOutputElement {
  public:
-  MyNoteButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDIAddress address, uint8_t* velocityPtr)
-    : noteButton(notePin), strumUpSwitch(strumUpPin), strumDownSwitch(strumDownPin), address(address), velocityPtr(velocityPtr) {}
+  MyNoteButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDI_Notes::Note note, uint8_t* octavePtr, uint8_t* velocityPtr)
+    : noteButton(notePin), strumUpSwitch(strumUpPin), strumDownSwitch(strumDownPin), note(note), octavePtr(octavePtr), velocityPtr(velocityPtr) {}
 
   void begin() final override { 
     noteButton.begin(); 
@@ -18,10 +18,10 @@ class MyNoteButton : public MIDIOutputElement {
     AH::Button::State strumUpState = strumUpSwitch.update();
     AH::Button::State strumDownState = strumDownSwitch.update();
 
-    if (noteState == AH::Button::Pressed && strumUpState == AH::Button::Falling) {
-      Control_Surface.sendNoteOn(address, *velocityPtr);  // Use the current velocity value
+    if (noteState == AH::Button::Pressed && (strumUpState == AH::Button::Falling || strumDownState == AH::Button::Falling)) {
+      Control_Surface.sendNoteOn({note[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
     } else if (noteState == AH::Button::Rising) {
-      Control_Surface.sendNoteOff(address, *velocityPtr); // Use the current velocity value
+      Control_Surface.sendNoteOff({note[*octavePtr], Channel_1}, *velocityPtr); // Use the current velocity value
     }
   }
 
@@ -29,14 +29,15 @@ class MyNoteButton : public MIDIOutputElement {
   AH::Button noteButton;
   AH::Button strumUpSwitch;
   AH::Button strumDownSwitch;
-  const MIDIAddress address;
+  MIDI_Notes::Note note;
+  uint8_t* octavePtr;
   uint8_t* velocityPtr;  // Pointer to velocity value
 };
 
 class MyHighNoteButton : public MIDIOutputElement {
  public:
-  MyHighNoteButton(pin_t notePin, MIDIAddress address, uint8_t* velocityPtr)
-    : noteButton(notePin), address(address), velocityPtr(velocityPtr) {}
+  MyHighNoteButton(pin_t notePin, MIDI_Notes::Note note, uint8_t* octavePtr, uint8_t* velocityPtr)
+    : noteButton(notePin), note(note), octavePtr(octavePtr), velocityPtr(velocityPtr) {}
 
   void begin() final override { 
     noteButton.begin(); 
@@ -46,15 +47,16 @@ class MyHighNoteButton : public MIDIOutputElement {
     AH::Button::State noteState = noteButton.update();
 
     if (noteState == AH::Button::Falling) {
-      Control_Surface.sendNoteOn(address, *velocityPtr);  // Use the current velocity value
+      Control_Surface.sendNoteOn({note[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
     } else if (noteState == AH::Button::Rising) {
-      Control_Surface.sendNoteOff(address, *velocityPtr); // Use the current velocity value
+      Control_Surface.sendNoteOff({note[*octavePtr], Channel_1}, *velocityPtr); // Use the current velocity value
     }
   }
 
  private:
   AH::Button noteButton;
-  const MIDIAddress address;
+  MIDI_Notes::Note note;
+  uint8_t* octavePtr;
   uint8_t* velocityPtr;  // Pointer to velocity value
 };
 
@@ -74,8 +76,13 @@ int yellowHighButton = 44;
 int blueHighButton = 46;
 int orangeHighButton = 48;
 
+int octaveUp = 8;
+int octaveDown = 9;
+
 int fiveSelectSwitch = A1;
+
 uint8_t vel = 127;
+uint8_t octave = 4;
 
 int ppp = 16;
 int pp = 32;
@@ -87,18 +94,18 @@ int ff = 112;
 int fff = 127;
 
 // Low Buttons for chords
-MyNoteButton greenLow {greenLowButton, strumUpPin, strumDownPin, {MIDI_Notes::C[4], Channel_1}, &vel};
-MyNoteButton redLow {redLowButton, strumUpPin, strumDownPin, {MIDI_Notes::D[4], Channel_1}, &vel};
-MyNoteButton yellowLow {yellowLowButton, strumUpPin, strumDownPin, {MIDI_Notes::Eb[4], Channel_1}, &vel};
-MyNoteButton blueLow {blueLowButton, strumUpPin, strumDownPin, {MIDI_Notes::F[4], Channel_1}, &vel};
-MyNoteButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, {MIDI_Notes::G[4], Channel_1}, &vel};
+MyNoteButton greenLow {greenLowButton, strumUpPin, strumDownPin, MIDI_Notes::C, &octave, &vel}; // 60 is MIDI note for C4
+MyNoteButton redLow {redLowButton, strumUpPin, strumDownPin, MIDI_Notes::E, &octave, &vel}; // 62 is MIDI note for D4
+MyNoteButton yellowLow {yellowLowButton, strumUpPin, strumDownPin, MIDI_Notes::G, &octave, &vel}; // 64 is MIDI note for E4
+MyNoteButton blueLow {blueLowButton, strumUpPin, strumDownPin, MIDI_Notes::A, &octave, &vel}; // 65 is MIDI note for F4
+MyNoteButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, MIDI_Notes::B, &octave, &vel}; // 67 is MIDI note for G4
 
 // High Buttons for single notes
-MyHighNoteButton greenHigh {greenHighButton, {MIDI_Notes::C[4], Channel_1}, &vel};
-MyHighNoteButton redHigh {redHighButton, {MIDI_Notes::D[4], Channel_1}, &vel};
-MyHighNoteButton yellowHigh {yellowHighButton, {MIDI_Notes::E[4], Channel_1}, &vel};
-MyHighNoteButton blueHigh {blueHighButton, {MIDI_Notes::G[4], Channel_1}, &vel};
-MyHighNoteButton orangeHigh {orangeHighButton, {MIDI_Notes::A[4], Channel_1}, &vel};
+MyHighNoteButton greenHigh {greenHighButton, MIDI_Notes::C, &octave, &vel};
+MyHighNoteButton redHigh {redHighButton, MIDI_Notes::D, &octave, &vel};
+MyHighNoteButton yellowHigh {yellowHighButton, MIDI_Notes::F, &octave, &vel};
+MyHighNoteButton blueHigh {blueHighButton, MIDI_Notes::Ab, &octave, &vel};
+MyHighNoteButton orangeHigh {orangeHighButton, MIDI_Notes::Bb, &octave, &vel};
 
 uint8_t getVelocityFromAnalogValue(int analogValue) {
   if (analogValue >= 130 && analogValue <= 190) {
@@ -117,6 +124,8 @@ uint8_t getVelocityFromAnalogValue(int analogValue) {
 }
 
 void setup() {
+  pinMode(octaveUp, INPUT_PULLUP);
+  pinMode(octaveDown, INPUT_PULLUP);
   Control_Surface.begin();
 }
 
@@ -126,8 +135,15 @@ void loop() {
   // Read the value from the potentiometer
   int fiveSelectSwitchVal = analogRead(fiveSelectSwitch);
   vel = getVelocityFromAnalogValue(fiveSelectSwitchVal);
+
+  // Update octave based on button presses
+  if (digitalRead(octaveUp) == LOW) {
+    if (octave < 8) octave++;
+    delay(200); // debounce delay
+  }
+  
+  if (digitalRead(octaveDown) == LOW) {
+    if (octave > -2) octave--;
+    delay(200); // debounce delay
+  }
 }
-  //if i want to add accent notes for after strumDown or strumUP, make a timer to count for about 1 second to allow for other notes to play wihtout strum
-  //Also make the octaves the same for both high and low buttons
-  //change highButton to chord button and lowButton to noteButton
-  //
