@@ -107,6 +107,11 @@ MyHighNoteButton yellowHigh {yellowHighButton, MIDI_Notes::F, &octave, &vel};
 MyHighNoteButton blueHigh {blueHighButton, MIDI_Notes::Ab, &octave, &vel};
 MyHighNoteButton orangeHigh {orangeHighButton, MIDI_Notes::Bb, &octave, &vel};
 
+PBPotentiometer pitchBend {
+  A0,
+  Channel_1
+};
+
 uint8_t getVelocityFromAnalogValue(int analogValue) {
   if (analogValue >= 130 && analogValue <= 190) {
     return ppp; 
