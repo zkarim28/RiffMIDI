@@ -1,11 +1,12 @@
 #include <Control_Surface.h>
 #include <MIDI_Constants/Chords/Chords.hpp>
+#include <LiquidCrystal.h>
 
 USBMIDI_Interface midi;
 
-class MyNoteButton : public MIDIOutputElement {
+class MyChordButton : public MIDIOutputElement {
  public:
-  MyNoteButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDI_Notes::Note* chord, uint8_t* octavePtr, uint8_t* velocityPtr)
+  MyChordButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDI_Notes::Note* chord, uint8_t* octavePtr, uint8_t* velocityPtr)
     : noteButton(notePin), strumUpSwitch(strumUpPin), strumDownSwitch(strumDownPin), chord(chord), octavePtr(octavePtr), velocityPtr(velocityPtr) {}
 
   void begin() final override { 
@@ -19,23 +20,13 @@ class MyNoteButton : public MIDIOutputElement {
     AH::Button::State strumUpState = strumUpSwitch.update();
     AH::Button::State strumDownState = strumDownSwitch.update();
 
-    if (noteState == AH::Button::Pressed && (strumUpState == AH::Button::Falling || strumDownState == AH::Button::Falling)) {
+    if (noteState == AH::Button::Pressed && strumDownState == AH::Button::Falling) {
       // Control_Surface.sendNoteOn({note[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
-
-      Control_Surface.sendNoteOn({chord[0][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
-      Control_Surface.sendNoteOn({chord[1][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
-      Control_Surface.sendNoteOn({chord[2][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
-
+      chordDown(chord, octavePtr, velocityPtr);
+    } else if (noteState == AH::Button::Pressed && strumUpState == AH::Button::Falling) {
+      chordUp(chord, octavePtr, velocityPtr);
     } else if (noteState == AH::Button::Rising) {
-      Control_Surface.sendNoteOff({chord[0][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
-      Control_Surface.sendNoteOff({chord[1][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
-      Control_Surface.sendNoteOff({chord[2][*octavePtr], Channel_1}, *velocityPtr);
-      delay(strumSpeed);
+      chordOff(chord, octavePtr, velocityPtr);
     }
   }
 
@@ -45,11 +36,31 @@ class MyNoteButton : public MIDIOutputElement {
   AH::Button strumDownSwitch;
   MIDI_Notes::Note* chord;
   uint8_t* octavePtr;
-  uint8_t* velocityPtr;  // Pointer to velocity value
-  int strumSpeed = 50;
+  uint8_t* velocityPtr;
+  int strumSpeed = 40;
 
-  void chordUp () {
-    
+  void chordDown (MIDI_Notes::Note* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
+      Control_Surface.sendNoteOn({chord[0][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+      Control_Surface.sendNoteOn({chord[1][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+      Control_Surface.sendNoteOn({chord[2][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+  }
+  
+  void chordUp (MIDI_Notes::Note* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
+      Control_Surface.sendNoteOn({chord[2][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+      Control_Surface.sendNoteOn({chord[1][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+      Control_Surface.sendNoteOn({chord[0][*octavePtr], Channel_1}, *velocityPtr);
+      delay(strumSpeed);
+  }
+
+  void chordOff (MIDI_Notes::Note* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
+      Control_Surface.sendNoteOff({chord[0][*octavePtr], Channel_1}, *velocityPtr);
+      Control_Surface.sendNoteOff({chord[1][*octavePtr], Channel_1}, *velocityPtr);
+      Control_Surface.sendNoteOff({chord[2][*octavePtr], Channel_1}, *velocityPtr);
   }
 
 };
@@ -109,6 +120,24 @@ int backButton = 11;
 
 int fiveSelectSwitch = A1;
 
+int lcdRS = 22;
+int lcdE = 24;
+int lcdD7 = 23;
+int lcdD6 = 25;
+int lcdD5 = 27;
+int lcdD4 = 29;
+int lcdD3 = 31;
+int lcdD2 = 33;
+int lcdD1 = 35;
+int lcdD0 = 37;
+
+//VDD -> 5V
+//VSS -> GND
+//R/W -> GND
+//A -> 5V
+//K -> GND
+//V0 to 10K pot
+
 uint8_t vel = 127;
 uint8_t octave = 4;
 
@@ -128,19 +157,12 @@ MIDI_Notes::Note yellowChord[] = {MIDI_Notes::G, MIDI_Notes::B, MIDI_Notes::D}; 
 MIDI_Notes::Note blueChord[] = {MIDI_Notes::E, MIDI_Notes::G, MIDI_Notes::B}; // E minor
 MIDI_Notes::Note orangeChord[] = {MIDI_Notes::D, MIDI_Notes::F, MIDI_Notes::A}; // D minor
 
-// // Low Buttons for chords
-// MyNoteButton greenLow {greenLowButton, strumUpPin, strumDownPin, MIDI_Notes::C, &octave, &vel}; // 60 is MIDI note for C4
-// MyNoteButton redLow {redLowButton, strumUpPin, strumDownPin, MIDI_Notes::E, &octave, &vel}; // 62 is MIDI note for D4
-// MyNoteButton yellowLow {yellowLowButton, strumUpPin, strumDownPin, MIDI_Notes::G, &octave, &vel}; // 64 is MIDI note for E4
-// MyNoteButton blueLow {blueLowButton, strumUpPin, strumDownPin, MIDI_Notes::A, &octave, &vel}; // 65 is MIDI note for F4
-// MyNoteButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, MIDI_Notes::B, &octave, &vel}; // 67 is MIDI note for G4
-
 // Low Buttons for chords
-MyNoteButton greenLow {greenLowButton, strumUpPin, strumDownPin, greenChord, &octave, &vel}; // 60 is MIDI note for C4
-MyNoteButton redLow {redLowButton, strumUpPin, strumDownPin, redChord, &octave, &vel}; // 62 is MIDI note for D4
-MyNoteButton yellowLow {yellowLowButton, strumUpPin, strumDownPin, yellowChord, &octave, &vel}; // 64 is MIDI note for E4
-MyNoteButton blueLow {blueLowButton, strumUpPin, strumDownPin, blueChord, &octave, &vel}; // 65 is MIDI note for F4
-MyNoteButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, orangeChord, &octave, &vel}; // 67 is MIDI note for G4
+MyChordButton greenLow {greenLowButton, strumUpPin, strumDownPin, greenChord, &octave, &vel}; // 60 is MIDI note for C4
+MyChordButton redLow {redLowButton, strumUpPin, strumDownPin, redChord, &octave, &vel}; // 62 is MIDI note for D4
+MyChordButton yellowLow {yellowLowButton, strumUpPin, strumDownPin, yellowChord, &octave, &vel}; // 64 is MIDI note for E4
+MyChordButton blueLow {blueLowButton, strumUpPin, strumDownPin, blueChord, &octave, &vel}; // 65 is MIDI note for F4
+MyChordButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, orangeChord, &octave, &vel}; // 67 is MIDI note for G4
 
 // High Buttons for single notes
 MyHighNoteButton greenHigh {greenHighButton, MIDI_Notes::C, &octave, &vel};
@@ -153,6 +175,13 @@ PBPotentiometer pitchBend {
   A0,
   Channel_1
 };
+
+LiquidCrystal lcd(lcdRS, lcdE, lcdD0, lcdD1, lcdD2, lcdD3, lcdD4, lcdD5, lcdD6, lcdD7);
+
+//I'm gonna need new another pointer for chordSize, and i need 
+//A new function that will be called when I change the chord
+
+
 
 uint8_t getVelocityFromAnalogValue(int analogValue) {
   if (analogValue >= 130 && analogValue <= 190) {
@@ -182,6 +211,17 @@ void setup() {
   pinMode(backButton, INPUT_PULLUP);
 
   // Serial.begin(9600); // Initialize serial communication
+
+  // Set up the LCD's number of columns and rows
+  lcd.begin(16, 2);
+
+  // Print the first line
+  lcd.setCursor(0, 0);
+  lcd.print("RiffMIDI");
+
+  // Print the second line
+  lcd.setCursor(0, 1);
+  lcd.print("RockBand Guitar");
 
   Control_Surface.begin();
 }
