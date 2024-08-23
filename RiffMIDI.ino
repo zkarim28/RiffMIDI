@@ -227,9 +227,9 @@ int bMaj1[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes
 int greenChord[sizeof(cMaj1) / sizeof(int)];
 
 // Array of chord pointers for greenChord
-int* greenChords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1};
+int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1};
 
-uint8_t greenChordSizes[] = {
+uint8_t chordSizes[] = {
     sizeof(cMaj1) / sizeof(int),        // Size of C Major 1st Position
     sizeof(cSharpMaj1) / sizeof(int),   // Size of C#/Db Major 1st Position
     sizeof(dMaj1) / sizeof(int),        // Size of D Major 1st Position
@@ -244,7 +244,7 @@ uint8_t greenChordSizes[] = {
     sizeof(bMaj1) / sizeof(int)         // Size of B Major 1st Position
 };
 
-const char* greenChordNames[] = {
+const char* chordNames[] = {
   "C Major",
   "C# Major",
   "D Major",
@@ -259,7 +259,7 @@ const char* greenChordNames[] = {
   "B Major"
 };
 
-uint8_t numGreenChords = 12;
+uint8_t numChords = 12;
 uint8_t currentGreenChordIndex = 0;
 
 int redChord[] = {MIDI_Notes::A[2], MIDI_Notes::E[3], MIDI_Notes::A[3], MIDI_Notes::C[4], MIDI_Notes::E[4]}; // A minor 1st Pos
@@ -344,7 +344,7 @@ void loop() {
   // Print the second line
   lcd.setCursor(0, 1);
   lcd.print("Chord: ");
-  lcd.print(greenChordNames[currentGreenChordIndex]);
+  lcd.print(chordNames[currentGreenChordIndex]);
 
   // Read the value from the potentiometer
   int fiveSelectSwitchVal = analogRead(fiveSelectSwitch);
@@ -358,7 +358,7 @@ void loop() {
         lcd.setCursor(0, 0);
         lcd.print("");
         lcd.setCursor(0, 1);
-        lcd.print(greenChordNames[currentGreenChordIndex]);
+        lcd.print(chordNames[currentGreenChordIndex]);
     }
 
   // Update octave based on button presses
@@ -373,19 +373,19 @@ void loop() {
   }
 
   if (digitalRead(upSelect) == LOW) {
-    currentGreenChordIndex = (currentGreenChordIndex + 1) % numGreenChords;  // Increment and wrap around
+    currentGreenChordIndex = (currentGreenChordIndex + 1) % numChords;  // Increment and wrap around
     memset(greenChord, 0, sizeof(greenChord)); // Clear old values in greenChord
-    memcpy(greenChord, greenChords[currentGreenChordIndex], greenChordSizes[currentGreenChordIndex] * sizeof(int));  // Copy the new chord into greenChord
-    greenChordSize = greenChordSizes[currentGreenChordIndex]; // Update the size of the current chord
+    memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));  // Copy the new chord into greenChord
+    greenChordSize = chordSizes[currentGreenChordIndex]; // Update the size of the current chord
     chordChanged = true;
     delay(200);  // Debounce delay
   }
     
   if (digitalRead(downSelect) == LOW) {
-    currentGreenChordIndex = (currentGreenChordIndex > 0) ? currentGreenChordIndex - 1 : numGreenChords - 1;  // Decrement and wrap around
+    currentGreenChordIndex = (currentGreenChordIndex > 0) ? currentGreenChordIndex - 1 : numChords - 1;  // Decrement and wrap around
     memset(greenChord, 0, sizeof(greenChord)); // Clear old values in greenChord
-    memcpy(greenChord, greenChords[currentGreenChordIndex], greenChordSizes[currentGreenChordIndex] * sizeof(int));  // Copy the new chord into greenChord
-    greenChordSize = greenChordSizes[currentGreenChordIndex]; // Update the size of the current chord
+    memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));  // Copy the new chord into greenChord
+    greenChordSize = chordSizes[currentGreenChordIndex]; // Update the size of the current chord
     chordChanged = true;
     delay(200);  // Debounce delay
   }
