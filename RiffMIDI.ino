@@ -1,6 +1,7 @@
 #include <Control_Surface.h>
 #include <MIDI_Constants/Chords/Chords.hpp>
 #include <LiquidCrystal.h>
+#include "chord_config.h"
 #define MAX_CHORD_SIZE 6  // Set this to the size of the largest chord
 USBMIDI_Interface midi;
 
@@ -365,11 +366,11 @@ const char* chordNames[] = {
 uint8_t currentChordEditMode = 0;  // 0 = Green, 1 = Red, 2 = Yellow, 3 = Blue, 4 = Orange
 uint8_t numChords = 36;
 
-uint8_t currentGreenChordIndex = 0; //C
-uint8_t currentRedChordIndex = 7; //G
-uint8_t currentYellowChordIndex = 22; //Am
-uint8_t currentBlueChordIndex = 5; //F
-uint8_t currentOrangeChordIndex = 11; //Bb
+uint8_t currentGreenChordIndex = GREEN_CHORD_INDEX;
+uint8_t currentRedChordIndex = RED_CHORD_INDEX;
+uint8_t currentYellowChordIndex = YELLOW_CHORD_INDEX;
+uint8_t currentBlueChordIndex = BLUE_CHORD_INDEX;
+uint8_t currentOrangeChordIndex = ORANGE_CHORD_INDEX;
 
 // Declare greenChord with the same size as cMaj1
 // int greenChord[sizeof(cMaj1) / sizeof(int)];
@@ -444,11 +445,16 @@ void setup() {
   pinMode(okButton, INPUT_PULLUP);
   pinMode(backButton, INPUT_PULLUP);
 
-  memcpy(greenChord, cMaj1, sizeof(cMaj1));
-  memcpy(redChord, gMaj1, sizeof(gMaj1));
-  memcpy(yellowChord, aMin1, sizeof(aMin1));
-  memcpy(blueChord, fMaj1, sizeof(fMaj1));
-  memcpy(orangeChord, aSharpMaj1, sizeof(aSharpMaj1));
+  memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));
+  greenChordSize = chordSizes[currentGreenChordIndex];
+  memcpy(redChord, chords[currentRedChordIndex], chordSizes[currentRedChordIndex] * sizeof(int));
+  redChordSize = chordSizes[currentRedChordIndex];
+  memcpy(yellowChord, chords[currentYellowChordIndex], chordSizes[currentYellowChordIndex] * sizeof(int));
+  yellowChordSize = chordSizes[currentYellowChordIndex];
+  memcpy(blueChord, chords[currentBlueChordIndex], chordSizes[currentBlueChordIndex] * sizeof(int));
+  blueChordSize = chordSizes[currentBlueChordIndex];
+  memcpy(orangeChord, chords[currentOrangeChordIndex], chordSizes[currentOrangeChordIndex] * sizeof(int));
+  orangeChordSize = chordSizes[currentOrangeChordIndex];
 
   // Set up the LCD's number of columns and rows
   lcd.begin(16, 2);
