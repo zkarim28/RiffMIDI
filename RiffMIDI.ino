@@ -2,7 +2,6 @@
 #include <MIDI_Constants/Chords/Chords.hpp>
 #include <LiquidCrystal.h>
 #define MAX_CHORD_SIZE 6  // Set this to the size of the largest chord
-//test comment
 USBMIDI_Interface midi;
 
 class MyChordButton : public MIDIOutputElement {
@@ -51,15 +50,6 @@ class MyChordButton : public MIDIOutputElement {
     }
   }
 
-  //   void chordDown (int* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
-  //     Control_Surface.sendNoteOn({chord[0], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  //     Control_Surface.sendNoteOn({chord[1], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  //     Control_Surface.sendNoteOn({chord[2], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  // }
-
   void chordUp (int* chord, uint8_t* chordSize, uint8_t* octavePtr, uint8_t* velocityPtr) {
     int i = (*chordSize) - 1;
     while (i > -1) {
@@ -68,15 +58,6 @@ class MyChordButton : public MIDIOutputElement {
       i--;
     }
   }
-  
-  // void chordUp (int* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
-  //     Control_Surface.sendNoteOn({chord[2], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  //     Control_Surface.sendNoteOn({chord[1], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  //     Control_Surface.sendNoteOn({chord[0], Channel_1}, *velocityPtr);
-  //     delay(strumSpeed);
-  // }
 
   void chordOff (int* chord, uint8_t* chordSize, uint8_t* octavePtr, uint8_t* velocityPtr) {
     int i = 0;
@@ -85,12 +66,6 @@ class MyChordButton : public MIDIOutputElement {
       i++;
     }
   }
-
-  // void chordOff (int* chord, uint8_t* octavePtr, uint8_t* velocityPtr) {
-  //     Control_Surface.sendNoteOff({chord[0], Channel_1}, *velocityPtr);
-  //     Control_Surface.sendNoteOff({chord[1], Channel_1}, *velocityPtr);
-  //     Control_Surface.sendNoteOff({chord[2], Channel_1}, *velocityPtr);
-  // }
 
 };
 
@@ -156,7 +131,6 @@ class MyHighNoteButton : public MIDIOutputElement {
 // Pin definitions
 int strumUpPin = 2;
 int strumDownPin = 3;
-
 
 int upSelect = 5;
 int downSelect = 6;
@@ -476,8 +450,6 @@ void setup() {
   memcpy(blueChord, fMaj1, sizeof(fMaj1));
   memcpy(orangeChord, aSharpMaj1, sizeof(aSharpMaj1));
 
-  // Serial.begin(9600); // Initialize serial communication
-
   // Set up the LCD's number of columns and rows
   lcd.begin(16, 2);
   Control_Surface.begin();
@@ -492,12 +464,12 @@ void loop() {
 
   chordChanged = false;
 
-  // Print the first line
+  // Print the top line of the 16x2 LCD
   lcd.setCursor(0, 0);
   lcd.print("Strum Speed: ");
   lcd.print(strumSpeed);
 
-  // Print the second line
+  // Print the bottom line of the 16x2 LCD
   lcd.setCursor(0, 1);
   switch (currentChordEditMode) {
     case 0:
