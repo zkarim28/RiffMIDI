@@ -1,7 +1,7 @@
 #include <Control_Surface.h>
 #include <MIDI_Constants/Chords/Chords.hpp>
 #include <LiquidCrystal.h>
-#include "chord_config.h"
+#include "chord_sets.h"
 #define MAX_CHORD_SIZE 6  // Set this to the size of the largest chord
 USBMIDI_Interface midi;
 
@@ -363,14 +363,15 @@ const char* chordNames[] = {
   "Bsus4",
 };
 
-uint8_t currentChordEditMode = 0;  // 0 = Green, 1 = Red, 2 = Yellow, 3 = Blue, 4 = Orange
 uint8_t numChords = 36;
 
-uint8_t currentGreenChordIndex = GREEN_CHORD_INDEX;
-uint8_t currentRedChordIndex = RED_CHORD_INDEX;
-uint8_t currentYellowChordIndex = YELLOW_CHORD_INDEX;
-uint8_t currentBlueChordIndex = BLUE_CHORD_INDEX;
-uint8_t currentOrangeChordIndex = ORANGE_CHORD_INDEX;
+uint8_t currentSetIndex = 0;
+
+uint8_t currentGreenChordIndex;
+uint8_t currentRedChordIndex;
+uint8_t currentYellowChordIndex;
+uint8_t currentBlueChordIndex;
+uint8_t currentOrangeChordIndex;
 
 // Declare greenChord with the same size as cMaj1
 // int greenChord[sizeof(cMaj1) / sizeof(int)];
@@ -418,6 +419,42 @@ MyHighNoteButton orangeHigh {orangeHighButton, strumUpPin, strumDownPin, MIDI_No
 
 LiquidCrystal lcd(lcdRS, lcdE, lcdD0, lcdD1, lcdD2, lcdD3, lcdD4, lcdD5, lcdD6, lcdD7);
 
+void applyChordSet(uint8_t setIndex) {
+  currentGreenChordIndex = chordSets[setIndex].green;
+  currentRedChordIndex = chordSets[setIndex].red;
+  currentYellowChordIndex = chordSets[setIndex].yellow;
+  currentBlueChordIndex = chordSets[setIndex].blue;
+  currentOrangeChordIndex = chordSets[setIndex].orange;
+
+  memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));
+  greenChordSize = chordSizes[currentGreenChordIndex];
+  memcpy(redChord, chords[currentRedChordIndex], chordSizes[currentRedChordIndex] * sizeof(int));
+  redChordSize = chordSizes[currentRedChordIndex];
+  memcpy(yellowChord, chords[currentYellowChordIndex], chordSizes[currentYellowChordIndex] * sizeof(int));
+  yellowChordSize = chordSizes[currentYellowChordIndex];
+  memcpy(blueChord, chords[currentBlueChordIndex], chordSizes[currentBlueChordIndex] * sizeof(int));
+  blueChordSize = chordSizes[currentBlueChordIndex];
+  memcpy(orangeChord, chords[currentOrangeChordIndex], chordSizes[currentOrangeChordIndex] * sizeof(int));
+  orangeChordSize = chordSizes[currentOrangeChordIndex];
+}
+
+// Shrinks a chord name (e.g. "C#sus4", "g#") down to at most 3 characters
+// so all 5 buttons' chords fit on one 16-character LCD line: note letter,
+// optional '#', and 'm' for minor / 's' for sus4 (blank suffix = major).
+void abbreviateChord(const char* name, char* out) {
+  int i = 0;
+  out[i++] = toupper(name[0]);
+  if (name[1] == '#') {
+    out[i++] = '#';
+  }
+  if (islower(name[0])) {
+    out[i++] = 'm';
+  } else if (strstr(name, "sus4") != NULL) {
+    out[i++] = 's';
+  }
+  out[i] = '\0';
+}
+
 uint8_t getVelocityFromAnalogValue(int analogValue) {
   if (analogValue >= 0 && analogValue <= 200) {
     return ppp; 
@@ -445,16 +482,7 @@ void setup() {
   pinMode(okButton, INPUT_PULLUP);
   pinMode(backButton, INPUT_PULLUP);
 
-  memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));
-  greenChordSize = chordSizes[currentGreenChordIndex];
-  memcpy(redChord, chords[currentRedChordIndex], chordSizes[currentRedChordIndex] * sizeof(int));
-  redChordSize = chordSizes[currentRedChordIndex];
-  memcpy(yellowChord, chords[currentYellowChordIndex], chordSizes[currentYellowChordIndex] * sizeof(int));
-  yellowChordSize = chordSizes[currentYellowChordIndex];
-  memcpy(blueChord, chords[currentBlueChordIndex], chordSizes[currentBlueChordIndex] * sizeof(int));
-  blueChordSize = chordSizes[currentBlueChordIndex];
-  memcpy(orangeChord, chords[currentOrangeChordIndex], chordSizes[currentOrangeChordIndex] * sizeof(int));
-  orangeChordSize = chordSizes[currentOrangeChordIndex];
+  applyChordSet(currentSetIndex);
 
   // Set up the LCD's number of columns and rows
   lcd.begin(16, 2);
@@ -470,35 +498,28 @@ void loop() {
 
   chordChanged = false;
 
-  // Print the top line of the 16x2 LCD
+  // Print the top line of the 16x2 LCD: G/R/Y/B/O chords, 3 chars each (15 total)
   lcd.setCursor(0, 0);
-  lcd.print("Strum Speed: ");
-  lcd.print(strumSpeed);
-
-  // Print the bottom line of the 16x2 LCD
-  lcd.setCursor(0, 1);
-  switch (currentChordEditMode) {
-    case 0:
-      lcd.print("Green: ");
-      lcd.print(chordNames[currentGreenChordIndex]);
-      break;
-    case 1:
-      lcd.print("Red: ");
-      lcd.print(chordNames[currentRedChordIndex]);
-      break;
-    case 2:
-      lcd.print("Yellow: ");
-      lcd.print(chordNames[currentYellowChordIndex]);
-      break;
-    case 3:
-      lcd.print("Blue: ");
-      lcd.print(chordNames[currentBlueChordIndex]);
-      break;
-    case 4:
-      lcd.print("Orange: ");
-      lcd.print(chordNames[currentOrangeChordIndex]);
-      break;
+  char abbr[4];
+  char field[4];
+  uint8_t rowIndices[] = {
+    currentGreenChordIndex, currentRedChordIndex, currentYellowChordIndex,
+    currentBlueChordIndex, currentOrangeChordIndex
+  };
+  for (uint8_t i = 0; i < 5; i++) {
+    abbreviateChord(chordNames[rowIndices[i]], abbr);
+    sprintf(field, "%-3s", abbr);
+    lcd.print(field);
   }
+
+  // Print the bottom line of the 16x2 LCD: current chord set and strum speed
+  lcd.setCursor(0, 1);
+  lcd.print("Set ");
+  lcd.print(currentSetIndex + 1);
+  lcd.print("/");
+  lcd.print(numChordSets);
+  lcd.print(" Spd:");
+  lcd.print(strumSpeed);
 
   // Read the value from the potentiometer
   int fiveSelectSwitchVal = analogRead(fiveSelectSwitch);
@@ -517,69 +538,20 @@ void loop() {
     delay(200); // debounce zq
   }
 
-if (digitalRead(downSelect) == LOW) {
-    switch (currentChordEditMode) {
-      case 0:
-        currentGreenChordIndex = (currentGreenChordIndex > 0) ? currentGreenChordIndex - 1 : numChords - 1;
-        memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));
-        greenChordSize = chordSizes[currentGreenChordIndex];
-        break;
-      case 1:
-        currentRedChordIndex = (currentRedChordIndex > 0) ? currentRedChordIndex - 1 : numChords - 1;
-        memcpy(redChord, chords[currentRedChordIndex], chordSizes[currentRedChordIndex] * sizeof(int));
-        redChordSize = chordSizes[currentRedChordIndex];
-        break;
-      case 2:
-        currentYellowChordIndex = (currentYellowChordIndex > 0) ? currentYellowChordIndex - 1 : numChords - 1;
-        memcpy(yellowChord, chords[currentYellowChordIndex], chordSizes[currentYellowChordIndex] * sizeof(int));
-        yellowChordSize = chordSizes[currentYellowChordIndex];
-        break;
-      case 3:
-        currentBlueChordIndex = (currentBlueChordIndex > 0) ? currentBlueChordIndex - 1 : numChords - 1;
-        memcpy(blueChord, chords[currentBlueChordIndex], chordSizes[currentBlueChordIndex] * sizeof(int));
-        blueChordSize = chordSizes[currentBlueChordIndex];
-        break;
-      case 4:
-        currentOrangeChordIndex = (currentOrangeChordIndex > 0) ? currentOrangeChordIndex - 1 : numChords - 1;
-        memcpy(orangeChord, chords[currentOrangeChordIndex], chordSizes[currentOrangeChordIndex] * sizeof(int));
-        orangeChordSize = chordSizes[currentOrangeChordIndex];
-        break;
-    }
+  // downSelect advances to the next chord set; upSelect goes back
+  if (digitalRead(downSelect) == LOW) {
+    currentSetIndex = (currentSetIndex + 1) % numChordSets;
+    applyChordSet(currentSetIndex);
     chordChanged = true;
     delay(200);  // Debounce delay
-}
+  }
 
-if (digitalRead(upSelect) == LOW) {
-    switch (currentChordEditMode) {
-      case 0:
-        currentGreenChordIndex = (currentGreenChordIndex + 1) % numChords;
-        memcpy(greenChord, chords[currentGreenChordIndex], chordSizes[currentGreenChordIndex] * sizeof(int));
-        greenChordSize = chordSizes[currentGreenChordIndex];
-        break;
-      case 1:
-        currentRedChordIndex = (currentRedChordIndex + 1) % numChords;
-        memcpy(redChord, chords[currentRedChordIndex], chordSizes[currentRedChordIndex] * sizeof(int));
-        redChordSize = chordSizes[currentRedChordIndex];
-        break;
-      case 2:
-        currentYellowChordIndex = (currentYellowChordIndex + 1) % numChords;
-        memcpy(yellowChord, chords[currentYellowChordIndex], chordSizes[currentYellowChordIndex] * sizeof(int));
-        yellowChordSize = chordSizes[currentYellowChordIndex];
-        break;
-      case 3:
-        currentBlueChordIndex = (currentBlueChordIndex + 1) % numChords;
-        memcpy(blueChord, chords[currentBlueChordIndex], chordSizes[currentBlueChordIndex] * sizeof(int));
-        blueChordSize = chordSizes[currentBlueChordIndex];
-        break;
-      case 4:
-        currentOrangeChordIndex = (currentOrangeChordIndex + 1) % numChords;
-        memcpy(orangeChord, chords[currentOrangeChordIndex], chordSizes[currentOrangeChordIndex] * sizeof(int));
-        orangeChordSize = chordSizes[currentOrangeChordIndex];
-        break;
-    }
+  if (digitalRead(upSelect) == LOW) {
+    currentSetIndex = (currentSetIndex > 0) ? currentSetIndex - 1 : numChordSets - 1;
+    applyChordSet(currentSetIndex);
     chordChanged = true;
     delay(200);  // Debounce delay
-}
+  }
   
   if (digitalRead(leftSelect) == LOW) {
     Serial.println("Left button pressed");
@@ -595,15 +567,6 @@ if (digitalRead(upSelect) == LOW) {
     strumSpeed = strumSpeed + 5;
   }
 
-  // Handle okButton press to move to the next chord
-  if (digitalRead(okButton) == LOW) {
-    currentChordEditMode = (currentChordEditMode + 1) % 5;  // Cycle through 0 to 4
-    delay(200); // Debounce delay
-  }
-
-  // Handle backButton press to move to the previous chord
-  if (digitalRead(backButton) == LOW) {
-    currentChordEditMode = (currentChordEditMode == 0) ? 4 : currentChordEditMode - 1;  // Cycle backwards
-    delay(200); // Debounce delay
-  }
+  // okButton / backButton are no longer used for chord editing -- chord
+  // sets are now defined from the GUI (flash_gui.py) rather than on-device.
 }
