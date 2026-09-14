@@ -110,7 +110,10 @@ class FlashApp:
     def _run_flash(self, hex_path, label):
         dfu = self.dfu_path
         shell_cmd = (
-            f"{shlex.quote(dfu)} atmega16u2 erase && "
+            # dfu-programmer's "erase" exits non-zero whenever it actually had to
+            # erase non-blank memory (even though the erase itself succeeds), so
+            # its exit code must not gate the rest of the chain.
+            f"{shlex.quote(dfu)} atmega16u2 erase; "
             f"{shlex.quote(dfu)} atmega16u2 flash {shlex.quote(hex_path)} && "
             f"{shlex.quote(dfu)} atmega16u2 reset"
         )
