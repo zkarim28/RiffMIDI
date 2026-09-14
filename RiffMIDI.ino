@@ -2,7 +2,7 @@
 #include <MIDI_Constants/Chords/Chords.hpp>
 #include <LiquidCrystal.h>
 #define MAX_CHORD_SIZE 6  // Set this to the size of the largest chord
-
+//test comment
 USBMIDI_Interface midi;
 
 class MyChordButton : public MIDIOutputElement {
@@ -282,8 +282,33 @@ int aSharpMin1[] = {MIDI_Notes::Bb[2], MIDI_Notes::F[3], MIDI_Notes::Bb[3], MIDI
 
 int bMin1[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes::D[4], MIDI_Notes::Gb[4]};//5
 
+// Sus4 chords (major shapes above with the 3rd raised a semitone to the 4th)
+int cSus4[] = {MIDI_Notes::C[3], MIDI_Notes::F[3], MIDI_Notes::G[3], MIDI_Notes::C[4], MIDI_Notes::F[4]}; //5
+
+int cSharpSus4[] = {MIDI_Notes::Db[3], MIDI_Notes::Gb[3], MIDI_Notes::Ab[3], MIDI_Notes::Db[4], MIDI_Notes::Gb[4]}; //5
+
+int dSus4[] = {MIDI_Notes::D[3], MIDI_Notes::A[3], MIDI_Notes::D[4], MIDI_Notes::G[4]}; //4
+
+int dSharpSus4[] = {MIDI_Notes::Eb[3], MIDI_Notes::Bb[3], MIDI_Notes::Eb[4], MIDI_Notes::Ab[4]}; //4
+
+int eSus4[] = {MIDI_Notes::E[2], MIDI_Notes::B[2], MIDI_Notes::E[3], MIDI_Notes::A[3], MIDI_Notes::B[3], MIDI_Notes::E[4]}; //6
+
+int fSus4[] = {MIDI_Notes::F[2], MIDI_Notes::C[3], MIDI_Notes::F[3], MIDI_Notes::Bb[3], MIDI_Notes::C[4], MIDI_Notes::F[4]}; //6
+
+int fSharpSus4[] = {MIDI_Notes::Gb[2], MIDI_Notes::Db[3], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes::Db[4], MIDI_Notes::Gb[4]}; //6
+
+int gSus4[] = {MIDI_Notes::G[2], MIDI_Notes::C[3], MIDI_Notes::D[3], MIDI_Notes::G[3], MIDI_Notes::C[4], MIDI_Notes::G[4]}; //6
+
+int gSharpSus4[] = {MIDI_Notes::Eb[3], MIDI_Notes::Ab[3], MIDI_Notes::Db[4], MIDI_Notes::Ab[4]}; //4
+
+int aSus4[] = {MIDI_Notes::A[2], MIDI_Notes::E[3], MIDI_Notes::A[3], MIDI_Notes::D[4], MIDI_Notes::E[4]}; //5
+
+int aSharpSus4[] = {MIDI_Notes::Bb[2], MIDI_Notes::F[3], MIDI_Notes::Bb[3], MIDI_Notes::Eb[4], MIDI_Notes::F[4]}; //5
+
+int bSus4[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes::E[4], MIDI_Notes::Gb[4]}; //5
+
 // Array of chord pointers for greenChord
-int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1};
+int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1, cSus4, cSharpSus4, dSus4, dSharpSus4, eSus4, fSus4, fSharpSus4, gSus4, gSharpSus4, aSus4, aSharpSus4, bSus4};
 
 uint8_t chordSizes[] = {
     sizeof(cMaj1) / sizeof(int),        // Size of C Major 1st Position
@@ -309,7 +334,19 @@ uint8_t chordSizes[] = {
     sizeof(gSharpMin1) / sizeof(int),   // Size of G#/Ab Major 1st Position
     sizeof(aMin1) / sizeof(int),        // Size of A Major 1st Position
     sizeof(aSharpMin1) / sizeof(int),   // Size of A#/Bb Major 1st Position
-    sizeof(bMin1) / sizeof(int)         // Size of B Major 1st Position
+    sizeof(bMin1) / sizeof(int),        // Size of B Major 1st Position
+    sizeof(cSus4) / sizeof(int),        // Size of C Sus4
+    sizeof(cSharpSus4) / sizeof(int),   // Size of C#/Db Sus4
+    sizeof(dSus4) / sizeof(int),        // Size of D Sus4
+    sizeof(dSharpSus4) / sizeof(int),   // Size of D#/Eb Sus4
+    sizeof(eSus4) / sizeof(int),        // Size of E Sus4
+    sizeof(fSus4) / sizeof(int),        // Size of F Sus4
+    sizeof(fSharpSus4) / sizeof(int),   // Size of F#/Gb Sus4
+    sizeof(gSus4) / sizeof(int),        // Size of G Sus4
+    sizeof(gSharpSus4) / sizeof(int),   // Size of G#/Ab Sus4
+    sizeof(aSus4) / sizeof(int),        // Size of A Sus4
+    sizeof(aSharpSus4) / sizeof(int),   // Size of A#/Bb Sus4
+    sizeof(bSus4) / sizeof(int)         // Size of B Sus4
 };
 
 const char* chordNames[] = {
@@ -337,10 +374,22 @@ const char* chordNames[] = {
   "a",
   "a#",
   "b",
+  "Csus4",
+  "C#sus4",
+  "Dsus4",
+  "D#sus4",
+  "Esus4",
+  "Fsus4",
+  "F#sus4",
+  "Gsus4",
+  "G#sus4",
+  "Asus4",
+  "A#sus4",
+  "Bsus4",
 };
 
 uint8_t currentChordEditMode = 0;  // 0 = Green, 1 = Red, 2 = Yellow, 3 = Blue, 4 = Orange
-uint8_t numChords = 24;
+uint8_t numChords = 36;
 
 uint8_t currentGreenChordIndex = 0; //C
 uint8_t currentRedChordIndex = 7; //G
@@ -386,10 +435,11 @@ MyHighNoteButton yellowHigh {yellowHighButton, strumUpPin, strumDownPin, MIDI_No
 MyHighNoteButton blueHigh {blueHighButton, strumUpPin, strumDownPin, MIDI_Notes::F, &octave, &vel};
 MyHighNoteButton orangeHigh {orangeHighButton, strumUpPin, strumDownPin, MIDI_Notes::Bb, &octave, &vel};
 
-PBPotentiometer pitchBend {
-  A0,
-  Channel_1
-};
+// Whammy bar temporarily disabled
+// PBPotentiometer pitchBend {
+//   A0,
+//   Channel_1
+// };
 
 LiquidCrystal lcd(lcdRS, lcdE, lcdD0, lcdD1, lcdD2, lcdD3, lcdD4, lcdD5, lcdD6, lcdD7);
 
