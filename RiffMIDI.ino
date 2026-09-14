@@ -282,8 +282,10 @@ int aSharpSus4[] = {MIDI_Notes::Bb[2], MIDI_Notes::F[3], MIDI_Notes::Bb[3], MIDI
 
 int bSus4[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes::E[4], MIDI_Notes::Gb[4]}; //5
 
+#include "custom_chords.h"
+
 // Array of chord pointers for greenChord
-int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1, cSus4, cSharpSus4, dSus4, dSharpSus4, eSus4, fSus4, fSharpSus4, gSus4, gSharpSus4, aSus4, aSharpSus4, bSus4};
+int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1, cSus4, cSharpSus4, dSus4, dSharpSus4, eSus4, fSus4, fSharpSus4, gSus4, gSharpSus4, aSus4, aSharpSus4, bSus4, CUSTOM_CHORDS_LIST};
 
 uint8_t chordSizes[] = {
     sizeof(cMaj1) / sizeof(int),        // Size of C Major 1st Position
@@ -321,7 +323,8 @@ uint8_t chordSizes[] = {
     sizeof(gSharpSus4) / sizeof(int),   // Size of G#/Ab Sus4
     sizeof(aSus4) / sizeof(int),        // Size of A Sus4
     sizeof(aSharpSus4) / sizeof(int),   // Size of A#/Bb Sus4
-    sizeof(bSus4) / sizeof(int)         // Size of B Sus4
+    sizeof(bSus4) / sizeof(int),        // Size of B Sus4
+    CUSTOM_CHORD_SIZES_LIST
 };
 
 const char* chordNames[] = {
@@ -361,9 +364,10 @@ const char* chordNames[] = {
   "Asus4",
   "A#sus4",
   "Bsus4",
+  CUSTOM_CHORD_NAMES_LIST
 };
 
-uint8_t numChords = 36;
+uint8_t numChords = sizeof(chords) / sizeof(int*);
 
 uint8_t currentSetIndex = 0;
 

@@ -15,8 +15,8 @@ struct ChordSet {
 };
 
 const ChordSet chordSets[] = {
-  {0, 7, 22, 5, 11},  // Set 1: C, G, a#, F, B
-  {29, 0, 0, 0, 0},  // Set 2: Fsus4, C, C, C, C
+  {0, 7, 38, 39, 40},  // Set 1: C, G, BV1, BV2, BV3
+  {0, 0, 0, 41, 42},  // Set 2: C, C, C, BVS1, BVS2
 };
 
 const uint8_t numChordSets = sizeof(chordSets) / sizeof(ChordSet);

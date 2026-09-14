@@ -6,6 +6,7 @@ Each step is a separate button so you can retry a step (e.g. picking the
 serial port again) without redoing the others.
 """
 
+import colorsys
 import json
 import os
 import re
@@ -14,11 +15,12 @@ import shutil
 import subprocess
 import threading
 import tkinter as tk
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, simpledialog, ttk
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 INO_PATH = os.path.join(SCRIPT_DIR, "RiffMIDI.ino")
 CHORD_SETS_PATH = os.path.join(SCRIPT_DIR, "chord_sets.h")
+CUSTOM_CHORDS_PATH = os.path.join(SCRIPT_DIR, "custom_chords.h")
 CONTROL_SURFACE_LIB = os.path.join(SCRIPT_DIR, "libraries", "Control-Surface")
 BUILD_CACHE_DIR = os.path.join(SCRIPT_DIR, ".build-cache")
 FQBN = "arduino:avr:mega"
@@ -34,6 +36,30 @@ BUTTON_SLOTS = [
     ("Blue", "blue"),
     ("Orange", "orange"),
 ]
+
+# Standard tuning, low string to high string (left to right, matching a
+# guitar-tech fretboard chart): (open-string label, open-string MIDI note).
+GUITAR_STRINGS = [
+    ("E", 40),  # 6th string, E2
+    ("A", 45),  # 5th string, A2
+    ("D", 50),  # 4th string, D3
+    ("G", 55),  # 3rd string, G3
+    ("B", 59),  # 2nd string, B3
+    ("E", 64),  # 1st string, E4
+]
+MAX_FRET = 24
+NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def note_name_at(open_midi, fret):
+    return NOTE_NAMES[(open_midi + fret) % 12]
+
+
+def note_color(name):
+    """A distinct pastel color per pitch class, consistent everywhere it's used."""
+    hue = NOTE_NAMES.index(name) / 12.0
+    r, g, b = colorsys.hsv_to_rgb(hue, 0.38, 0.95)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
 def find_tool(name, extra_candidates=()):
@@ -117,6 +143,54 @@ def write_chord_sets(path, sets, chord_names):
         "#endif",
         "",
     ]
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
+def parse_custom_chords(path):
+    """Parse the customChordN[] arrays out of custom_chords.h, in order.
+    Returns a list of {"name": str, "notes": [int, ...]}."""
+    if not os.path.isfile(path):
+        return []
+    with open(path, "r") as f:
+        text = f.read()
+    rows = re.findall(
+        r"int\s+customChord\d+\[\]\s*=\s*\{([^}]*)\};\s*//\s*(.*)", text
+    )
+    result = []
+    for notes_str, name in rows:
+        notes = [int(n.strip()) for n in notes_str.split(",") if n.strip()]
+        result.append({"name": name.strip(), "notes": notes})
+    return result
+
+
+def write_custom_chords(path, custom_chords):
+    lines = [
+        "// Custom chords built from flash_gui.py's fretboard chord builder. Each",
+        "// array lists the actual MIDI note numbers for the strings that are",
+        "// played (low to high; muted strings are simply left out). These get",
+        "// appended onto the built-in chords[]/chordSizes[]/chordNames[] arrays",
+        "// in RiffMIDI.ino. Edit by hand only if you're not using the GUI.",
+        "#ifndef CUSTOM_CHORDS_H",
+        "#define CUSTOM_CHORDS_H",
+        "",
+    ]
+    for i, c in enumerate(custom_chords):
+        notes_str = ", ".join(str(n) for n in c["notes"])
+        lines.append(f"int customChord{i}[] = {{{notes_str}}};  // {c['name']}")
+    lines.append("")
+    if custom_chords:
+        array_names = [f"customChord{i}" for i in range(len(custom_chords))]
+        lines.append(f"#define CUSTOM_CHORDS_LIST {', '.join(array_names)}")
+        sizes = [f"(sizeof({n}) / sizeof(int))" for n in array_names]
+        lines.append(f"#define CUSTOM_CHORD_SIZES_LIST {', '.join(sizes)}")
+        names = ", ".join(f'"{c["name"]}"' for c in custom_chords)
+        lines.append(f"#define CUSTOM_CHORD_NAMES_LIST {names}")
+    else:
+        lines.append("#define CUSTOM_CHORDS_LIST")
+        lines.append("#define CUSTOM_CHORD_SIZES_LIST")
+        lines.append("#define CUSTOM_CHORD_NAMES_LIST")
+    lines += ["", "#endif", ""]
     with open(path, "w") as f:
         f.write("\n".join(lines))
 
@@ -210,6 +284,154 @@ class ChordSetDialog(tk.Toplevel):
         self.destroy()
 
 
+class ChordBuilderDialog(tk.Toplevel):
+    """Fretboard grid to build a custom chord: click one fret per string
+    (at most one), or click the selected fret again to mute that string."""
+
+    def __init__(self, parent, initial_notes=None, initial_name=""):
+        super().__init__(parent)
+        self.title("Custom Chord Builder")
+        self.resizable(False, False)
+        self.result = None
+
+        # selection[string_index] = fret number played on that string, or
+        # None if that string is muted (not played).
+        self.selection = [0] * len(GUITAR_STRINGS)
+        if initial_notes:
+            self.selection = [None] * len(GUITAR_STRINGS)
+            remaining = list(initial_notes)
+            for i, (_, open_midi) in enumerate(GUITAR_STRINGS):
+                for note in list(remaining):
+                    if 0 <= note - open_midi <= MAX_FRET:
+                        self.selection[i] = note - open_midi
+                        remaining.remove(note)
+                        break
+
+        self.buttons = [[] for _ in GUITAR_STRINGS]
+
+        tk.Label(
+            self,
+            text="Click a note to play it on that string. Click the selected\n"
+                 "note again to mute (not play) that string.",
+            justify="left",
+        ).pack(anchor="w", padx=10, pady=(10, 4))
+
+        name_row = tk.Frame(self)
+        name_row.pack(fill="x", padx=10, pady=(0, 8))
+        tk.Label(name_row, text="Chord name:").pack(side="left")
+        self.name_var = tk.StringVar(value=initial_name)
+        tk.Entry(name_row, textvariable=self.name_var, width=30).pack(side="left", padx=(6, 0))
+
+        # --- Tab entry: type/pick a fret 0-24 (or "-" for muted) per string,
+        # kept in sync with clicks on the fretboard grid below. ---
+        tab_frame = tk.LabelFrame(self, text="Tab entry (fret 0-24, or - for muted)", padx=8, pady=6)
+        tab_frame.pack(fill="x", padx=10, pady=(0, 8))
+
+        tab_values = ["-"] + [str(i) for i in range(MAX_FRET + 1)]
+        self.tab_vars = []
+        for col, (label, _) in enumerate(GUITAR_STRINGS):
+            string_col = tk.Frame(tab_frame)
+            string_col.pack(side="left", padx=4)
+            tk.Label(string_col, text=label, font=("", 9, "bold")).pack()
+            var = tk.StringVar(value=self._tab_value(col))
+            combo = ttk.Combobox(
+                string_col, textvariable=var, values=tab_values, width=3, state="readonly"
+            )
+            combo.pack()
+            combo.bind("<<ComboboxSelected>>", lambda e, c=col: self._on_tab_change(c))
+            self.tab_vars.append(var)
+
+        container = tk.Frame(self)
+        container.pack(padx=10, pady=(0, 6))
+        canvas = tk.Canvas(container, height=420, highlightthickness=0)
+        scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        grid_frame = tk.Frame(canvas)
+
+        def _on_grid_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"), width=event.width)
+        grid_frame.bind("<Configure>", _on_grid_configure)
+        canvas.create_window((0, 0), window=grid_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Header row: open-string letters
+        for col, (label, _) in enumerate(GUITAR_STRINGS):
+            tk.Label(
+                grid_frame, text=label, width=4, bg="#4a3222", fg="white", font=("", 10, "bold")
+            ).grid(row=0, column=col + 1, padx=1, pady=1)
+        tk.Label(grid_frame, text="", width=3, bg="#4a3222").grid(row=0, column=0)
+
+        for fret in range(0, MAX_FRET + 1):
+            tk.Label(grid_frame, text=str(fret), width=3).grid(row=fret + 1, column=0)
+            for col, (_, open_midi) in enumerate(GUITAR_STRINGS):
+                name = note_name_at(open_midi, fret)
+                btn = tk.Button(
+                    grid_frame, text=name, width=4, bg=note_color(name),
+                    relief="raised", borderwidth=1,
+                    command=lambda c=col, fr=fret: self._on_cell_click(c, fr),
+                )
+                btn.grid(row=fret + 1, column=col + 1, padx=1, pady=1)
+                self.buttons[col].append(btn)
+
+        for col in range(len(GUITAR_STRINGS)):
+            self._refresh_column(col)
+
+        btn_row = tk.Frame(self)
+        btn_row.pack(fill="x", padx=10, pady=(0, 10))
+        tk.Button(btn_row, text="Cancel", command=self.destroy).pack(side="right")
+        tk.Button(btn_row, text="OK", command=self._on_ok).pack(side="right", padx=(0, 8))
+
+        self.transient(parent)
+        self.grab_set()
+
+    def _tab_value(self, col):
+        fret = self.selection[col]
+        return "-" if fret is None else str(fret)
+
+    def _on_cell_click(self, col, fret):
+        if self.selection[col] == fret:
+            self.selection[col] = None
+        else:
+            self.selection[col] = fret
+        self.tab_vars[col].set(self._tab_value(col))
+        self._refresh_column(col)
+
+    def _on_tab_change(self, col):
+        val = self.tab_vars[col].get()
+        self.selection[col] = None if val == "-" else int(val)
+        self._refresh_column(col)
+
+    def _refresh_column(self, col):
+        selected_fret = self.selection[col]
+        for fret, btn in enumerate(self.buttons[col]):
+            name = btn.cget("text").strip("[]")
+            if fret == selected_fret:
+                btn.configure(text=f"[{name}]", relief="sunken", borderwidth=3)
+            else:
+                btn.configure(text=name, relief="raised", borderwidth=1)
+
+    def _on_ok(self):
+        notes = []
+        for col, (_, open_midi) in enumerate(GUITAR_STRINGS):
+            fret = self.selection[col]
+            if fret is not None:
+                notes.append(open_midi + fret)
+        if not notes:
+            messagebox.showerror("No notes selected", "Select at least one string to play.")
+            return
+        name = self.name_var.get().strip()
+        if not name:
+            messagebox.showerror("Name required", "Give this chord a name.")
+            return
+        self.result = {"name": name, "notes": notes}
+        self.destroy()
+
+
 class FlashApp:
     def __init__(self, root):
         self.root = root
@@ -218,14 +440,37 @@ class FlashApp:
 
         self.dfu_path = find_dfu_programmer()
         self.arduino_cli_path = find_arduino_cli()
-        self.chord_names = parse_chord_names(INO_PATH)
+        self.builtin_chord_names = parse_chord_names(INO_PATH)
+        self.custom_chords = parse_custom_chords(CUSTOM_CHORDS_PATH)
+        self.chord_names = []
+        self._recompute_chord_names()
         self.all_buttons = []
         self.chord_sets = read_chord_sets(CHORD_SETS_PATH) or [{f: 0 for _, f in BUTTON_SLOTS}]
 
         pad = {"padx": 12, "pady": 6}
 
+        # --- Custom chords ---
+        custom_frame = tk.LabelFrame(root, text="1. Custom Chords", padx=10, pady=10)
+        custom_frame.pack(fill="x", **pad)
+
+        custom_list_row = tk.Frame(custom_frame)
+        custom_list_row.pack(fill="x")
+        self.custom_listbox = tk.Listbox(custom_list_row, width=60, height=4, exportselection=False)
+        self.custom_listbox.pack(side="left", fill="x", expand=True)
+
+        custom_btn_col = tk.Frame(custom_list_row)
+        custom_btn_col.pack(side="left", padx=(8, 0))
+        self.add_custom_button = self._add_button(
+            custom_btn_col, "Build Custom Chord...", self.add_custom_chord, fill="x", pady=2
+        )
+        self.delete_custom_button = self._add_button(
+            custom_btn_col, "Delete Custom Chord", self.delete_custom_chord, fill="x", pady=2
+        )
+
+        self._refresh_custom_listbox()
+
         # --- Chord sets ---
-        sets_frame = tk.LabelFrame(root, text="1. Chord Sets (Up/Down select cycles these on the board)", padx=10, pady=10)
+        sets_frame = tk.LabelFrame(root, text="2. Chord Sets (Up/Down select cycles these on the board)", padx=10, pady=10)
         sets_frame.pack(fill="x", **pad)
 
         list_row = tk.Frame(sets_frame)
@@ -250,16 +495,16 @@ class FlashApp:
 
         self._refresh_sets_listbox()
 
-        # --- Step 2: flash Arduino firmware ---
-        step2_frame = tk.LabelFrame(root, text="2. Flash Arduino (USB-Serial) Firmware", padx=10, pady=10)
+        # --- Step 3: flash Arduino firmware ---
+        step2_frame = tk.LabelFrame(root, text="3. Flash Arduino (USB-Serial) Firmware", padx=10, pady=10)
         step2_frame.pack(fill="x", **pad)
         tk.Label(step2_frame, text="Puts the board in upload mode so the sketch can be sent to it.").pack(anchor="w")
         self.flash_arduino_button = self._add_button(
             step2_frame, "Flash Arduino Firmware...", self.flash_arduino_firmware, anchor="w", pady=(6, 0)
         )
 
-        # --- Step 3: upload sketch ---
-        step3_frame = tk.LabelFrame(root, text="3. Compile && Upload Sketch", padx=10, pady=10)
+        # --- Step 4: upload sketch ---
+        step3_frame = tk.LabelFrame(root, text="4. Compile && Upload Sketch", padx=10, pady=10)
         step3_frame.pack(fill="x", **pad)
 
         port_row = tk.Frame(step3_frame)
@@ -276,8 +521,8 @@ class FlashApp:
             step3_frame, "Compile && Upload", self.upload_sketch, anchor="w", pady=(6, 0)
         )
 
-        # --- Step 4: flash MIDI firmware ---
-        step4_frame = tk.LabelFrame(root, text="4. Flash MIDI Firmware", padx=10, pady=10)
+        # --- Step 5: flash MIDI firmware ---
+        step4_frame = tk.LabelFrame(root, text="5. Flash MIDI Firmware", padx=10, pady=10)
         step4_frame.pack(fill="x", **pad)
         tk.Label(step4_frame, text="Restores the board to a class-compliant MIDI controller.").pack(anchor="w")
         self.flash_midi_button = self._add_button(
@@ -329,6 +574,53 @@ class FlashApp:
     def _selected_set_index(self):
         selection = self.sets_listbox.curselection()
         return selection[0] if selection else None
+
+    def _recompute_chord_names(self):
+        self.chord_names = self.builtin_chord_names + [c["name"] for c in self.custom_chords]
+
+    def _refresh_custom_listbox(self):
+        self.custom_listbox.delete(0, tk.END)
+        for i, c in enumerate(self.custom_chords):
+            note_names = "-".join(NOTE_NAMES[n % 12] for n in c["notes"])
+            self.custom_listbox.insert(tk.END, f"{c['name']} ({note_names})")
+
+    # ---------- custom chords ----------
+
+    def add_custom_chord(self):
+        dialog = ChordBuilderDialog(self.root)
+        self.root.wait_window(dialog)
+        if dialog.result is None:
+            return
+        if dialog.result["name"] in self.chord_names:
+            messagebox.showerror("Name already used", "Pick a different chord name.")
+            return
+        self.custom_chords.append(dialog.result)
+        write_custom_chords(CUSTOM_CHORDS_PATH, self.custom_chords)
+        self._recompute_chord_names()
+        self._refresh_custom_listbox()
+        self.append_log(f"\n=== Added custom chord '{dialog.result['name']}' to custom_chords.h ===\n")
+
+    def delete_custom_chord(self):
+        selection = self.custom_listbox.curselection()
+        if not selection:
+            messagebox.showerror("No chord selected", "Select a custom chord to delete.")
+            return
+        index = selection[0]
+        is_last = index == len(self.custom_chords) - 1
+        if not is_last:
+            proceed = messagebox.askokcancel(
+                "Deleting a non-last custom chord",
+                "This isn't the last custom chord in the list. Deleting it will shift "
+                "the index of every custom chord after it, which can silently change "
+                "the chords in any existing chord set that references one of them.\n\n"
+                "Continue anyway?",
+            )
+            if not proceed:
+                return
+        del self.custom_chords[index]
+        write_custom_chords(CUSTOM_CHORDS_PATH, self.custom_chords)
+        self._recompute_chord_names()
+        self._refresh_custom_listbox()
 
     def _run_dfu_flash(self, hex_path, label):
         if self.dfu_path is None:
