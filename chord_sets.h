@@ -7,6 +7,7 @@
 #define CHORD_SETS_H
 
 struct ChordSet {
+  const char* name;
   uint8_t green;
   uint8_t red;
   uint8_t yellow;
@@ -15,8 +16,9 @@ struct ChordSet {
 };
 
 const ChordSet chordSets[] = {
-  {0, 7, 38, 39, 40},  // Set 1: C, G, BV1, BV2, BV3
-  {0, 0, 0, 41, 42},  // Set 2: C, C, C, BVS1, BVS2
+  {"Verse", 0, 7, 50, 51, 52},  // C, G, BV1, BV2, BV3
+  {"Chorus", 0, 0, 0, 53, 54},  // C, C, C, BVS1, BVS2
+  {"Bloody Valentine", 0, 0, 56, 57, 58},  // C, C, MGK1, MGK2, MGK3
 };
 
 const uint8_t numChordSets = sizeof(chordSets) / sizeof(ChordSet);

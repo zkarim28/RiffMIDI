@@ -2,6 +2,7 @@
 #include <MIDI_Constants/Chords/Chords.hpp>
 #include <LiquidCrystal.h>
 #include "chord_sets.h"
+#include "note_sets.h"
 #define MAX_CHORD_SIZE 6  // Set this to the size of the largest chord
 USBMIDI_Interface midi;
 
@@ -97,11 +98,11 @@ class MyChordButton : public MIDIOutputElement {
 
 class MyHighNoteButton : public MIDIOutputElement {
  public:
-  MyHighNoteButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDI_Notes::Note note, uint8_t* octavePtr, uint8_t* velocityPtr)
-    : noteButton(notePin), strumUpSwitch(strumUpPin), strumDownSwitch(strumDownPin), note(note), octavePtr(octavePtr), velocityPtr(velocityPtr) {}
+  MyHighNoteButton(pin_t notePin, pin_t strumUpPin, pin_t strumDownPin, MIDI_Notes::Note* notePtr, uint8_t* octavePtr, uint8_t* velocityPtr)
+    : noteButton(notePin), strumUpSwitch(strumUpPin), strumDownSwitch(strumDownPin), notePtr(notePtr), octavePtr(octavePtr), velocityPtr(velocityPtr) {}
 
-  void begin() final override { 
-    noteButton.begin(); 
+  void begin() final override {
+    noteButton.begin();
     strumUpSwitch.begin();
     strumDownSwitch.begin();
   }
@@ -112,11 +113,11 @@ class MyHighNoteButton : public MIDIOutputElement {
     AH::Button::State strumDownState = strumDownSwitch.update();
 
     if (noteState == AH::Button::Pressed && strumDownState == AH::Button::Falling) {
-      Control_Surface.sendNoteOn({note[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
+      Control_Surface.sendNoteOn({(*notePtr)[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
     } else if (noteState == AH::Button::Pressed && strumUpState == AH::Button::Falling) {
-      Control_Surface.sendNoteOn({note[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
+      Control_Surface.sendNoteOn({(*notePtr)[*octavePtr], Channel_1}, *velocityPtr);  // Use the current velocity value
     } else if (noteState == AH::Button::Rising) {
-      Control_Surface.sendNoteOff({note[*octavePtr], Channel_1}, *velocityPtr); // Use the current velocity value
+      Control_Surface.sendNoteOff({(*notePtr)[*octavePtr], Channel_1}, *velocityPtr); // Use the current velocity value
     }
   }
 
@@ -124,7 +125,7 @@ class MyHighNoteButton : public MIDIOutputElement {
   AH::Button noteButton;
   AH::Button strumUpSwitch;
   AH::Button strumDownSwitch;
-  MIDI_Notes::Note note;
+  MIDI_Notes::Note* notePtr;
   uint8_t* octavePtr;
   uint8_t* velocityPtr;  // Pointer to velocity value
 };
@@ -282,10 +283,40 @@ int aSharpSus4[] = {MIDI_Notes::Bb[2], MIDI_Notes::F[3], MIDI_Notes::Bb[3], MIDI
 
 int bSus4[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3], MIDI_Notes::B[3], MIDI_Notes::E[4], MIDI_Notes::Gb[4]}; //5
 
+// Power chords (root + perfect 5th, no 3rd) -- classic 2-note rock voicing
+int cPower[] = {MIDI_Notes::C[2], MIDI_Notes::G[2]}; //2
+
+int cSharpPower[] = {MIDI_Notes::Db[2], MIDI_Notes::Ab[2]}; //2
+
+int dPower[] = {MIDI_Notes::D[2], MIDI_Notes::A[2]}; //2
+
+int dSharpPower[] = {MIDI_Notes::Eb[2], MIDI_Notes::Bb[2]}; //2
+
+int ePower[] = {MIDI_Notes::E[2], MIDI_Notes::B[2]}; //2
+
+int fPower[] = {MIDI_Notes::F[2], MIDI_Notes::C[3]}; //2
+
+int fSharpPower[] = {MIDI_Notes::Gb[2], MIDI_Notes::Db[3]}; //2
+
+int gPower[] = {MIDI_Notes::G[2], MIDI_Notes::D[3]}; //2
+
+int gSharpPower[] = {MIDI_Notes::Ab[2], MIDI_Notes::Eb[3]}; //2
+
+int aPower[] = {MIDI_Notes::A[2], MIDI_Notes::E[3]}; //2
+
+int aSharpPower[] = {MIDI_Notes::Bb[2], MIDI_Notes::F[3]}; //2
+
+int bPower[] = {MIDI_Notes::B[2], MIDI_Notes::Gb[3]}; //2
+
+// NOTE: adding a new built-in chord category above this line shifts every
+// custom chord's absolute index (since they're appended after all built-ins
+// via CUSTOM_CHORDS_LIST below). After doing that, re-save every chord set
+// in flash_gui.py (it looks up indices by name, so re-saving fixes them) --
+// chord_sets.h on disk still has the OLD numeric indices until you do.
 #include "custom_chords.h"
 
 // Array of chord pointers for greenChord
-int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1, cSus4, cSharpSus4, dSus4, dSharpSus4, eSus4, fSus4, fSharpSus4, gSus4, gSharpSus4, aSus4, aSharpSus4, bSus4, CUSTOM_CHORDS_LIST};
+int* chords[] = {cMaj1, cSharpMaj1, dMaj1, dSharpMaj1, eMaj1, fMaj1, fSharpMaj1, gMaj1, gSharpMaj1, aMaj1, aSharpMaj1, bMaj1, cMin1, cSharpMin1, dMin1, dSharpMin1, eMin1, fMin1, fSharpMin1, gMin1, gSharpMin1, aMin1, aSharpMin1, bMin1, cSus4, cSharpSus4, dSus4, dSharpSus4, eSus4, fSus4, fSharpSus4, gSus4, gSharpSus4, aSus4, aSharpSus4, bSus4, cPower, cSharpPower, dPower, dSharpPower, ePower, fPower, fSharpPower, gPower, gSharpPower, aPower, aSharpPower, bPower, CUSTOM_CHORDS_LIST};
 
 uint8_t chordSizes[] = {
     sizeof(cMaj1) / sizeof(int),        // Size of C Major 1st Position
@@ -324,6 +355,18 @@ uint8_t chordSizes[] = {
     sizeof(aSus4) / sizeof(int),        // Size of A Sus4
     sizeof(aSharpSus4) / sizeof(int),   // Size of A#/Bb Sus4
     sizeof(bSus4) / sizeof(int),        // Size of B Sus4
+    sizeof(cPower) / sizeof(int),       // Size of C Power
+    sizeof(cSharpPower) / sizeof(int),  // Size of C#/Db Power
+    sizeof(dPower) / sizeof(int),       // Size of D Power
+    sizeof(dSharpPower) / sizeof(int),  // Size of D#/Eb Power
+    sizeof(ePower) / sizeof(int),       // Size of E Power
+    sizeof(fPower) / sizeof(int),       // Size of F Power
+    sizeof(fSharpPower) / sizeof(int),  // Size of F#/Gb Power
+    sizeof(gPower) / sizeof(int),       // Size of G Power
+    sizeof(gSharpPower) / sizeof(int),  // Size of G#/Ab Power
+    sizeof(aPower) / sizeof(int),       // Size of A Power
+    sizeof(aSharpPower) / sizeof(int),  // Size of A#/Bb Power
+    sizeof(bPower) / sizeof(int),       // Size of B Power
     CUSTOM_CHORD_SIZES_LIST
 };
 
@@ -364,12 +407,36 @@ const char* chordNames[] = {
   "Asus4",
   "A#sus4",
   "Bsus4",
+  "C5",
+  "C#5",
+  "D5",
+  "D#5",
+  "E5",
+  "F5",
+  "F#5",
+  "G5",
+  "G#5",
+  "A5",
+  "A#5",
+  "B5",
   CUSTOM_CHORD_NAMES_LIST
 };
 
 uint8_t numChords = sizeof(chords) / sizeof(int*);
 
 uint8_t currentSetIndex = 0;
+uint8_t currentNoteSetIndex = 0;
+
+// Current note for each High button; updated by applyNoteSet(). MyHighNoteButton
+// holds a pointer to these, not a copy, so switching sets takes effect live.
+MIDI_Notes::Note greenNote = noteSets[0].green;
+MIDI_Notes::Note redNote = noteSets[0].red;
+MIDI_Notes::Note yellowNote = noteSets[0].yellow;
+MIDI_Notes::Note blueNote = noteSets[0].blue;
+MIDI_Notes::Note orangeNote = noteSets[0].orange;
+
+bool showingNoteToast = false;
+unsigned long noteToastUntil = 0;
 
 uint8_t currentGreenChordIndex;
 uint8_t currentRedChordIndex;
@@ -409,11 +476,11 @@ MyChordButton blueLow {blueLowButton, strumUpPin, strumDownPin, blueChord, &blue
 MyChordButton orangeLow {orangeLowButton, strumUpPin, strumDownPin, orangeChord, &orangeChordSize, &octave, &vel, &strumSpeed}; // 67 is MIDI note for G4
 
 // High Buttons for single notes
-MyHighNoteButton greenHigh {greenHighButton, strumUpPin, strumDownPin, MIDI_Notes::C, &octave, &vel};
-MyHighNoteButton redHigh {redHighButton, strumUpPin, strumDownPin, MIDI_Notes::G, &octave, &vel};
-MyHighNoteButton yellowHigh {yellowHighButton, strumUpPin, strumDownPin, MIDI_Notes::A, &octave, &vel};
-MyHighNoteButton blueHigh {blueHighButton, strumUpPin, strumDownPin, MIDI_Notes::F, &octave, &vel};
-MyHighNoteButton orangeHigh {orangeHighButton, strumUpPin, strumDownPin, MIDI_Notes::Bb, &octave, &vel};
+MyHighNoteButton greenHigh {greenHighButton, strumUpPin, strumDownPin, &greenNote, &octave, &vel};
+MyHighNoteButton redHigh {redHighButton, strumUpPin, strumDownPin, &redNote, &octave, &vel};
+MyHighNoteButton yellowHigh {yellowHighButton, strumUpPin, strumDownPin, &yellowNote, &octave, &vel};
+MyHighNoteButton blueHigh {blueHighButton, strumUpPin, strumDownPin, &blueNote, &octave, &vel};
+MyHighNoteButton orangeHigh {orangeHighButton, strumUpPin, strumDownPin, &orangeNote, &octave, &vel};
 
 // Whammy bar temporarily disabled
 // PBPotentiometer pitchBend {
@@ -442,6 +509,15 @@ void applyChordSet(uint8_t setIndex) {
   orangeChordSize = chordSizes[currentOrangeChordIndex];
 }
 
+void applyNoteSet(uint8_t setIndex) {
+  currentNoteSetIndex = setIndex;
+  greenNote = noteSets[setIndex].green;
+  redNote = noteSets[setIndex].red;
+  yellowNote = noteSets[setIndex].yellow;
+  blueNote = noteSets[setIndex].blue;
+  orangeNote = noteSets[setIndex].orange;
+}
+
 // Shrinks a chord name (e.g. "C#sus4", "g#") down to at most 3 characters
 // so all 5 buttons' chords fit on one 16-character LCD line: note letter,
 // optional '#', and 'm' for minor / 's' for sus4 (blank suffix = major).
@@ -455,6 +531,8 @@ void abbreviateChord(const char* name, char* out) {
     out[i++] = 'm';
   } else if (strstr(name, "sus4") != NULL) {
     out[i++] = 's';
+  } else if (name[strlen(name) - 1] == '5') {
+    out[i++] = '5';
   }
   out[i] = '\0';
 }
@@ -487,6 +565,7 @@ void setup() {
   pinMode(backButton, INPUT_PULLUP);
 
   applyChordSet(currentSetIndex);
+  applyNoteSet(currentNoteSetIndex);
 
   // Set up the LCD's number of columns and rows
   lcd.begin(16, 2);
@@ -496,9 +575,11 @@ void setup() {
 void loop() {
   Control_Surface.loop();
 
-    if (chordChanged) {
+  bool shouldShowNoteToast = millis() < noteToastUntil;
+  if (chordChanged || shouldShowNoteToast != showingNoteToast) {
     lcd.clear();
   }
+  showingNoteToast = shouldShowNoteToast;
 
   chordChanged = false;
 
@@ -516,14 +597,18 @@ void loop() {
     lcd.print(field);
   }
 
-  // Print the bottom line of the 16x2 LCD: current chord set and strum speed
+  // Print the bottom line of the 16x2 LCD: normally the current chord set
+  // name and strum speed, but briefly swap in the note set name right after
+  // Ok/Back changes it (there's no room to show both at once).
   lcd.setCursor(0, 1);
-  lcd.print("Set ");
-  lcd.print(currentSetIndex + 1);
-  lcd.print("/");
-  lcd.print(numChordSets);
-  lcd.print(" Spd:");
-  lcd.print(strumSpeed);
+  if (showingNoteToast) {
+    lcd.print("Notes: ");
+    lcd.print(noteSets[currentNoteSetIndex].name);
+  } else {
+    lcd.print(chordSets[currentSetIndex].name);
+    lcd.print(" Spd:");
+    lcd.print(strumSpeed);
+  }
 
   // Read the value from the potentiometer
   int fiveSelectSwitchVal = analogRead(fiveSelectSwitch);
@@ -571,6 +656,17 @@ void loop() {
     strumSpeed = strumSpeed + 5;
   }
 
-  // okButton / backButton are no longer used for chord editing -- chord
-  // sets are now defined from the GUI (flash_gui.py) rather than on-device.
+  // okButton/backButton cycle note sets (separate from Up/Down, which cycles
+  // chord sets). Briefly show the note set's name on the LCD when it changes.
+  if (digitalRead(okButton) == LOW) {
+    applyNoteSet((currentNoteSetIndex + 1) % numNoteSets);
+    noteToastUntil = millis() + 1500;
+    delay(200);
+  }
+
+  if (digitalRead(backButton) == LOW) {
+    applyNoteSet((currentNoteSetIndex > 0) ? currentNoteSetIndex - 1 : numNoteSets - 1);
+    noteToastUntil = millis() + 1500;
+    delay(200);
+  }
 }
