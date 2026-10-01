@@ -12,6 +12,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import threading
 import tkinter as tk
@@ -242,6 +243,41 @@ def run_privileged_shell(shell_cmd, timeout=120):
         return -1, str(exc)
 
 
+def kill_process_group(proc):
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        proc.wait(timeout=5)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def run_with_timeout_killing_children(cmd, timeout, on_start=None):
+    """Like subprocess.run(..., timeout=...), but on timeout kills the whole
+    process group instead of just the direct child. Without this, a timed-out
+    `arduino-cli compile --upload` leaves its avrdude grandchild running
+    forever if avrdude is the one actually stuck (e.g. on a bad serial port)
+    -- subprocess.run's own timeout handling only kills arduino-cli itself.
+
+    `on_start`, if given, is called with the Popen object right after it's
+    created, so the caller can track it (e.g. to kill it if the GUI closes
+    mid-command, not just on timeout)."""
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        start_new_session=True,  # its own process group, so we can kill it whole
+    )
+    if on_start is not None:
+        on_start(proc)
+    try:
+        output, _ = proc.communicate(timeout=timeout)
+        return proc.returncode, output
+    except subprocess.TimeoutExpired:
+        kill_process_group(proc)
+        return -1, f"Timed out after {timeout}s -- killed the process and any children (e.g. avrdude)."
+
+
 class ChordSetDialog(tk.Toplevel):
     """Modal dialog to pick/edit the 5 chords (one per button) for one set."""
 
@@ -437,7 +473,9 @@ class FlashApp:
         self.root = root
         root.title("RiffMIDI Board Programmer")
         root.resizable(False, False)
+        root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self.active_proc = None
         self.dfu_path = find_dfu_programmer()
         self.arduino_cli_path = find_arduino_cli()
         self.builtin_chord_names = parse_chord_names(INO_PATH)
@@ -755,13 +793,29 @@ class FlashApp:
             SCRIPT_DIR,
         ]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-            output = (result.stdout or "") + (result.stderr or "")
-            self.root.after(0, self._upload_done, result.returncode, output)
-        except subprocess.TimeoutExpired:
-            self.root.after(0, self._upload_done, -1, "Timed out compiling/uploading.")
+            returncode, output = run_with_timeout_killing_children(
+                cmd, timeout=180, on_start=self._set_active_proc
+            )
+            self.root.after(0, self._upload_done, returncode, output)
         except Exception as exc:  # noqa: BLE001
             self.root.after(0, self._upload_done, -1, str(exc))
+        finally:
+            self._set_active_proc(None)
+
+    def _set_active_proc(self, proc):
+        self.active_proc = proc
+
+    def _on_close(self):
+        if self.active_proc is not None:
+            proceed = messagebox.askokcancel(
+                "Operation in progress",
+                "A compile/upload is still running. Closing now will kill it "
+                "(and any child process it spawned, like avrdude). Continue?",
+            )
+            if not proceed:
+                return
+            kill_process_group(self.active_proc)
+        self.root.destroy()
 
     def _upload_done(self, returncode, output):
         self.append_log(output if output else "(no output)\n")
